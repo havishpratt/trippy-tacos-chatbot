@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   role: "user" | "assistant";
@@ -12,11 +13,15 @@ export default function ChatBot() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [isLoading]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,8 +29,6 @@ export default function ChatBot() {
 
     const userMessage = input.trim();
     setInput("");
-
-    // Add user message
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
 
@@ -38,31 +41,9 @@ export default function ChatBot() {
 
       if (!res.ok) throw new Error("Chat request failed");
 
-      // Stream the response
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-
-      // Add empty assistant message to fill in
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          setMessages((prev) => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last.role === "assistant") {
-              last.content += chunk;
-            }
-            return updated;
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Chat error:", error);
+      const text = await res.text();
+      setMessages((prev) => [...prev, { role: "assistant", content: text }]);
+    } catch {
       setMessages((prev) => [
         ...prev,
         {
@@ -76,75 +57,93 @@ export default function ChatBot() {
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "500px",
-        maxWidth: "600px",
-        border: "1px solid #e2e8f0",
-        borderRadius: "12px",
-        overflow: "hidden",
-        fontFamily: "system-ui, sans-serif",
-      }}
-    >
+    <div className="chat-container">
       {/* Header */}
-      <div
-        style={{
-          padding: "16px",
-          borderBottom: "1px solid #e2e8f0",
-          fontWeight: 600,
-          fontSize: "14px",
-        }}
-      >
-        Trippy Tacos — Review Insights
-      </div>
+      <header className="chat-header">
+        <div className="header-icon">🌮</div>
+        <div>
+          <h1 className="header-title">Trippy Tacos</h1>
+          <p className="header-subtitle">Review Insights</p>
+        </div>
+      </header>
 
       {/* Messages */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "16px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "12px",
-        }}
-      >
+      <div className="chat-messages">
         {messages.length === 0 && (
-          <p style={{ color: "#94a3b8", fontSize: "14px", margin: "auto" }}>
-            Ask about customer reviews, sentiment, or feedback trends.
-          </p>
+          <div className="empty-state">
+            <div className="empty-icon">📊</div>
+            <p className="empty-title">What do your customers think?</p>
+            <p className="empty-hint">
+              Ask about reviews, sentiment, menu items, or feedback trends.
+            </p>
+          </div>
         )}
 
         {messages.map((msg, i) => (
           <div
             key={i}
-            style={{
-              alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-              background: msg.role === "user" ? "#3b82f6" : "#f1f5f9",
-              color: msg.role === "user" ? "white" : "#1e293b",
-              padding: "10px 14px",
-              borderRadius: "12px",
-              maxWidth: "80%",
-              fontSize: "14px",
-              lineHeight: 1.5,
-              whiteSpace: "pre-wrap",
-            }}
+            className={`message ${msg.role === "user" ? "message-user" : "message-assistant"}`}
           >
-            {msg.content}
+            {msg.role === "assistant" && (
+              <div className="assistant-avatar">🌮</div>
+            )}
+            <div
+              className={`message-bubble ${msg.role === "user" ? "bubble-user" : "bubble-assistant"}`}
+            >
+              {msg.role === "assistant" ? (
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => (
+                      <p className="md-p">{children}</p>
+                    ),
+                    strong: ({ children }) => (
+                      <strong className="md-strong">{children}</strong>
+                    ),
+                    ul: ({ children }) => (
+                      <ul className="md-ul">{children}</ul>
+                    ),
+                    ol: ({ children }) => (
+                      <ol className="md-ol">{children}</ol>
+                    ),
+                    li: ({ children }) => (
+                      <li className="md-li">{children}</li>
+                    ),
+                    h1: ({ children }) => (
+                      <h3 className="md-heading">{children}</h3>
+                    ),
+                    h2: ({ children }) => (
+                      <h3 className="md-heading">{children}</h3>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 className="md-heading">{children}</h3>
+                    ),
+                    code: ({ children }) => (
+                      <code className="md-code">{children}</code>
+                    ),
+                    blockquote: ({ children }) => (
+                      <blockquote className="md-blockquote">
+                        {children}
+                      </blockquote>
+                    ),
+                  }}
+                >
+                  {msg.content}
+                </ReactMarkdown>
+              ) : (
+                msg.content
+              )}
+            </div>
           </div>
         ))}
 
         {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
-          <div
-            style={{
-              alignSelf: "flex-start",
-              color: "#94a3b8",
-              fontSize: "14px",
-            }}
-          >
-            Thinking...
+          <div className="message message-assistant">
+            <div className="assistant-avatar">🌮</div>
+            <div className="bubble-assistant loading-bubble">
+              <span className="dot" />
+              <span className="dot" />
+              <span className="dot" />
+            </div>
           </div>
         )}
 
@@ -152,44 +151,34 @@ export default function ChatBot() {
       </div>
 
       {/* Input */}
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          display: "flex",
-          padding: "12px",
-          borderTop: "1px solid #e2e8f0",
-          gap: "8px",
-        }}
-      >
+      <form onSubmit={handleSubmit} className="chat-input-bar">
         <input
+          ref={inputRef}
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="What do customers say about..."
           disabled={isLoading}
-          style={{
-            flex: 1,
-            padding: "10px 14px",
-            border: "1px solid #e2e8f0",
-            borderRadius: "8px",
-            fontSize: "14px",
-            outline: "none",
-          }}
+          className="chat-input"
         />
         <button
           type="submit"
           disabled={isLoading || !input.trim()}
-          style={{
-            padding: "10px 20px",
-            background: isLoading ? "#94a3b8" : "#3b82f6",
-            color: "white",
-            border: "none",
-            borderRadius: "8px",
-            fontSize: "14px",
-            cursor: isLoading ? "not-allowed" : "pointer",
-          }}
+          className="chat-send"
         >
-          Send
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
         </button>
       </form>
     </div>
