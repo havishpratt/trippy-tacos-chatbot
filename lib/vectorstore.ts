@@ -1,12 +1,11 @@
 import { SupabaseVectorStore } from "@langchain/community/vectorstores/supabase";
-import { OpenAIEmbeddings } from "@langchain/openai";
+import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 import { supabaseAdmin } from "./supabase";
 
-// Embedding model — text-embedding-3-small is cheap and effective
-// ~$0.02 per 1M tokens, 1536 dimensions
-export const embeddings = new OpenAIEmbeddings({
-  model: "text-embedding-3-small",
-  openAIApiKey: process.env.OPENAI_API_KEY,
+// Embedding model — Google text-embedding-004, 768 dimensions
+export const embeddings = new GoogleGenerativeAIEmbeddings({
+  model: "text-embedding-004",
+  apiKey: process.env.GOOGLE_API_KEY,
 });
 
 // Vector store backed by Supabase pgvector

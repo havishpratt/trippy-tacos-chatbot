@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { ChatOpenAI } from "@langchain/openai";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import {
   ChatPromptTemplate,
@@ -26,13 +26,12 @@ When answering:
 Context from customer reviews:
 {context}`;
 
-// LLM — swap model here to control cost
-// "gpt-4o-mini" is cheap for V1, upgrade to "gpt-4o" for V2
-const llm = new ChatOpenAI({
-  model: "gpt-4o-mini",
-  temperature: 0.3, // Lower = more factual, less creative
+// LLM — Gemini 2.5 Flash, very cheap
+const llm = new ChatGoogleGenerativeAI({
+  model: "gemini-2.5-flash-preview-05-20",
+  temperature: 0.3,
   streaming: true,
-  openAIApiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.GOOGLE_API_KEY,
 });
 
 // Build the RAG chain

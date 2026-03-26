@@ -1,4 +1,4 @@
--- Enable the pgvector extension (run once)
+-- Enable the pgvector extension
 create extension if not exists vector;
 
 -- Reviews table with vector embeddings
