@@ -2,9 +2,9 @@ import { SupabaseVectorStore } from "@langchain/community/vectorstores/supabase"
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 import { supabaseAdmin } from "./supabase";
 
-// Embedding model — Google text-embedding-004, 768 dimensions
+// Embedding model — Google gemini-embedding-001, 3072 dimensions
 export const embeddings = new GoogleGenerativeAIEmbeddings({
-  model: "text-embedding-004",
+  model: "gemini-embedding-001",
   apiKey: process.env.GOOGLE_API_KEY,
 });
 

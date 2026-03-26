@@ -6,17 +6,16 @@ create table if not exists reviews (
   id bigserial primary key,
   content text not null,                    -- The review text chunk
   metadata jsonb default '{}'::jsonb,       -- Source, rating, date, reviewer, etc.
-  embedding vector(768),                    -- Google text-embedding-004 dimension
+  embedding vector(3072),                    -- Google text-embedding-004 dimension
   created_at timestamptz default now()
 );
 
 -- Index for fast similarity search
-create index on reviews using ivfflat (embedding vector_cosine_ops)
-  with (lists = 100);
+create index on reviews using hnsw (embedding vector_cosine_ops);
 
 -- RPC function: match reviews by cosine similarity
 create or replace function match_reviews (
-  query_embedding vector(768),
+  query_embedding vector(3072),
   match_count int default 5,
   filter jsonb default '{}'::jsonb
 )
