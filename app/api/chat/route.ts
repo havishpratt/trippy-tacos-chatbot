@@ -11,7 +11,10 @@ import {
   RunnablePassthrough,
 } from "@langchain/core/runnables";
 import { retriever } from "@/lib/vectorstore";
-import { formatDocumentsAsString } from "langchain/util/document";
+import type { Document } from "@langchain/core/documents";
+
+const formatDocumentsAsString = (docs: Document[]): string =>
+  docs.map((doc) => doc.pageContent).join("\n\n");
 
 // System prompt — tune this for Trippy Tacos' voice
 const SYSTEM_PROMPT = `You are a helpful assistant for Trippy Tacos, a food truck business. 
