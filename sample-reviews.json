@@ -1,0 +1,44 @@
+{
+  "reviews": [
+    {
+      "text": "Best food truck tacos in Silver Spring! The al pastor is incredible, perfectly marinated with a nice char. Salsa verde is legit spicy. Only downside is the wait can be 20+ minutes on weekends.",
+      "source": "google",
+      "rating": 5,
+      "date": "2025-01-10",
+      "reviewer": "Maria L.",
+      "location": "Silver Spring"
+    },
+    {
+      "text": "Decent tacos but nothing special. The carne asada was a bit dry. Portions are generous though and the staff is super friendly. Would come back to try other items.",
+      "source": "yelp",
+      "rating": 3,
+      "date": "2025-02-03",
+      "reviewer": "Dave R.",
+      "location": "Bethesda"
+    },
+    {
+      "text": "Trippy Tacos is a vibe. The birria tacos are hands down the best I've had in MoCo. The consomme for dipping is rich and flavorful. They also have great horchata. 10/10 recommend.",
+      "source": "google",
+      "rating": 5,
+      "date": "2025-01-22",
+      "reviewer": "Priya K.",
+      "location": "Rockville"
+    },
+    {
+      "text": "Went for lunch on a Tuesday, barely any wait. Fish tacos were fresh and crispy. The mango habanero sauce is fire. Prices are reasonable for the quality. Will definitely be a regular.",
+      "source": "google",
+      "rating": 4,
+      "date": "2025-02-15",
+      "reviewer": "Chris M.",
+      "location": "Silver Spring"
+    },
+    {
+      "text": "Ordered the trippy combo and it was way too much food lol. Everything tasted great though. The elote is a must-try. My only complaint is they ran out of the churros before I could order.",
+      "source": "yelp",
+      "rating": 4,
+      "date": "2025-03-01",
+      "reviewer": "Jasmine T.",
+      "location": "Wheaton"
+    }
+  ]
+}
