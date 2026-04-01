@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Document } from "@langchain/core/documents";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import {
+  DEFAULT_REVIEW_EXTRACTED_METADATA,
+  extractReviewMetadata,
+} from "@/lib/extract-metadata";
 import { vectorStore } from "@/lib/vectorstore";
+
+const INGEST_BATCH_SIZE = 5;
+
+type IngestReview = {
+  text: string;
+  source?: string;
+  rating?: number | null;
+  date?: string | null;
+  reviewer?: string | null;
+  location?: string | null;
+};
 
 /**
  * POST /api/ingest
@@ -21,19 +37,53 @@ import { vectorStore } from "@/lib/vectorstore";
  * For V1: copy-paste reviews into this format and POST.
  */
 
-function prependReviewAttribution(review: {
-  text: string;
-  source?: string;
-  rating?: number | null;
-  date?: string | null;
-  reviewer?: string | null;
-}): string {
+function prependReviewAttribution(review: IngestReview): string {
   const reviewer = review.reviewer?.trim() || "anonymous";
   const date = review.date || "unknown date";
   const ratingLabel =
     review.rating == null ? "unrated" : String(review.rating);
   const source = review.source || "unknown";
   return `[Review by ${reviewer} on ${date} — ${ratingLabel}★ via ${source}]\n\n${review.text}`;
+}
+
+/**
+ * Runs extractReviewMetadata + chunking for each review in parallel; returns all docs for the batch.
+ */
+async function processReviewBatch(
+  splitter: RecursiveCharacterTextSplitter,
+  batch: IngestReview[]
+): Promise<Document[]> {
+  const chunkGroups = await Promise.all(
+    batch.map(async (review) => {
+      let extracted = DEFAULT_REVIEW_EXTRACTED_METADATA;
+      try {
+        extracted = await extractReviewMetadata(review.text);
+      } catch (err) {
+        console.warn(
+          "Ingest: extractReviewMetadata failed for a review; using default extraction fields.",
+          err
+        );
+      }
+
+      const textWithTag = prependReviewAttribution(review);
+      const metadata = {
+        source: review.source || "unknown",
+        rating: review.rating || null,
+        date: review.date || null,
+        reviewer: review.reviewer || "anonymous",
+        location: review.location || null,
+        sentiment: extracted.sentiment,
+        items_mentioned: extracted.items_mentioned,
+        issues: extracted.issues,
+        price_mentions: extracted.price_mentions,
+        language: extracted.language,
+      };
+
+      return splitter.createDocuments([textWithTag], [metadata]);
+    })
+  );
+
+  return chunkGroups.flat();
 }
 
 export async function POST(req: NextRequest) {
@@ -53,23 +103,12 @@ export async function POST(req: NextRequest) {
       chunkOverlap: 200,
     });
 
-    const docs = [];
+    const docs: Document[] = [];
 
-    for (const review of reviews) {
-      const textWithTag = prependReviewAttribution(review);
-      const chunks = await splitter.createDocuments(
-        [textWithTag],
-        [
-          {
-            source: review.source || "unknown",
-            rating: review.rating || null,
-            date: review.date || null,
-            reviewer: review.reviewer || "anonymous",
-            location: review.location || null,
-          },
-        ]
-      );
-      docs.push(...chunks);
+    for (let i = 0; i < reviews.length; i += INGEST_BATCH_SIZE) {
+      const batch = reviews.slice(i, i + INGEST_BATCH_SIZE) as IngestReview[];
+      const batchDocs = await processReviewBatch(splitter, batch);
+      docs.push(...batchDocs);
     }
 
     // Embed and store all chunks

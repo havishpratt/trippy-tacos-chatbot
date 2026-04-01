@@ -27,15 +27,16 @@ Database setup: run migrations via `supabase db push` or execute `supabase/migra
 ## Architecture
 
 ```
-POST /api/ingest → chunk reviews (RecursiveCharacterTextSplitter, 2000/200, with reviewer/date tag prepended) → embed (Google gemini-embedding-001) → store in Supabase `reviews` table
+POST /api/ingest → per review: LLM metadata extraction (Gemini 2.5 Flash — sentiment, items_mentioned, issues, price_mentions, language) → chunk (RecursiveCharacterTextSplitter, 2000/200, with reviewer/date tag prepended) → embed (Google gemini-embedding-001) → store in Supabase `reviews` table
 
 POST /api/chat → embed user query → similarity search (top-10 via match_reviews RPC) → inject context into system prompt → invoke Gemini 2.5 Flash response
 ```
 
 - **lib/supabase.ts** — Supabase admin client (service role key, server-side only)
 - **lib/vectorstore.ts** — SupabaseVectorStore + GoogleGenerativeAIEmbeddings + retriever (k=10)
+- **lib/extract-metadata.ts** — `extractReviewMetadata`: Gemini 2.5 Flash (temperature 0) returns structured fields for ingest
 - **app/api/chat/route.ts** — Retrieves relevant chunks, injects into system prompt, returns non-streaming Gemini 2.5 Flash response
-- **app/api/ingest/route.ts** — Accepts `{ reviews: [...] }`, chunks and embeds into pgvector
+- **app/api/ingest/route.ts** — Accepts `{ reviews: [...] }`; sequentially extracts metadata per review, merges into chunk JSONB, embeds into pgvector
 - **components/ChatBot.tsx** — Client component, sends message and displays plain text response
 - **supabase/migrations/** — Creates `reviews` table (3072-dim vector), `match_reviews` RPC function, and `chat_sessions` table stub for V2
 
@@ -44,5 +45,5 @@ POST /api/chat → embed user query → similarity search (top-10 via match_revi
 - Embeddings are 3072 dimensions (Google gemini-embedding-001). The pgvector column and RPC function are hardcoded to this.
 - Chat uses Gemini 2.5 Flash via direct `ChatPromptTemplate` + `llm.invoke()` (non-streaming to avoid thinking mode duplication).
 - Response is returned via non-streaming `invoke`, not streaming.
-- Review metadata (source, rating, date, reviewer, location) is stored in a JSONB column and the `match_reviews` RPC supports JSONB `@>` filtering.
+- Each row’s `metadata` JSONB column stores: **source**, **rating**, **date**, **reviewer**, **location** (from the ingest payload), plus **sentiment** (`positive` | `mixed` | `negative`), **items_mentioned** (string[]), **issues** (string[]), **price_mentions** (object mapping item keys to price strings), and **language** (e.g. `en`, `es`) from LLM extraction. The `match_reviews` RPC supports JSONB `@>` filtering on this object.
 - Each review is prepended with a [Review by X on Y] tag before chunking so chunks are self-contained and citable.
