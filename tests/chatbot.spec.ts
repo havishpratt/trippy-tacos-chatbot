@@ -68,8 +68,11 @@ test.describe("API Routes", () => {
       data: { message: "what do people think about the tacos?" },
     });
     expect(response.status()).toBe(200);
-    const text = await response.text();
-    expect(text.length).toBeGreaterThan(10);
+    expect(response.headers()["content-type"]).toContain("application/json");
+    const json = await response.json();
+    expect(typeof json.text).toBe("string");
+    expect(json.text.length).toBeGreaterThan(10);
+    expect(Array.isArray(json.sources)).toBe(true);
   });
 
   test("POST /api/chat returns 400 without message", async ({ request }) => {

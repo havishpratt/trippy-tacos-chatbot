@@ -4,8 +4,48 @@ import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages
 import { retriever } from "@/lib/vectorstore";
 import type { Document } from "@langchain/core/documents";
 
-const formatDocumentsAsString = (docs: Document[]): string =>
-  docs.map((doc) => doc.pageContent).join("\n\n");
+type ChatSource = {
+  index: number;
+  reviewer: string;
+  date: string | null;
+  source: string;
+  rating: number | null;
+};
+
+const formatNumberedContext = (docs: Document[]): string =>
+  docs.map((doc, i) => `[${i + 1}] ${doc.pageContent}`).join("\n\n");
+
+function buildSourcesFromDocs(docs: Document[]): ChatSource[] {
+  return docs.map((doc, i) => {
+    const m = (doc.metadata || {}) as Record<string, unknown>;
+    const reviewerRaw = m.reviewer;
+    const reviewer =
+      typeof reviewerRaw === "string" && reviewerRaw.trim() !== ""
+        ? reviewerRaw.trim()
+        : "Anonymous";
+    const dateRaw = m.date;
+    const date =
+      dateRaw != null && String(dateRaw).trim() !== ""
+        ? String(dateRaw)
+        : null;
+    const sourceRaw = m.source;
+    const source =
+      typeof sourceRaw === "string" && sourceRaw.trim() !== ""
+        ? sourceRaw.trim()
+        : "unknown";
+    const rating =
+      typeof m.rating === "number" && !Number.isNaN(m.rating)
+        ? m.rating
+        : null;
+    return {
+      index: i + 1,
+      reviewer,
+      date,
+      source,
+      rating,
+    };
+  });
+}
 
 const SYSTEM_PROMPT = `You are a smart business assistant for Trippy Tacos, a food truck and restaurant in Wheaton, MD. Your audience is the restaurant's owners and employees — not customers.
 
@@ -19,6 +59,8 @@ Your job is to analyze customer reviews and provide clear, actionable insights. 
 - If the reviews don't contain enough info, say so. Never make up data.
 
 If the user sends a casual message (greeting, small talk, off-topic), respond briefly and naturally — don't force an analysis. Only analyze reviews when the user asks a question about their business, feedback, or menu.
+
+When referencing specific reviews, cite them using [1], [2], etc. corresponding to the numbered reviews in the context. Only cite reviews you actually reference.
 
 Context from customer reviews:
 {context}`;
@@ -42,7 +84,8 @@ export async function POST(req: NextRequest) {
 
     // Retrieve relevant reviews
     const docs = await retriever.invoke(message);
-    const context = formatDocumentsAsString(docs);
+    const sources = buildSourcesFromDocs(docs);
+    const context = formatNumberedContext(docs);
 
     if (process.env.NODE_ENV === "development") {
       console.log("\n=== RAG DEBUG ===");
@@ -86,8 +129,9 @@ export async function POST(req: NextRequest) {
       text = String(response.content);
     }
 
-    return new Response(text, {
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    const body = JSON.stringify({ text, sources });
+    return new Response(body, {
+      headers: { "Content-Type": "application/json; charset=utf-8" },
     });
   } catch (error: any) {
     console.error("Chat error:", error);
