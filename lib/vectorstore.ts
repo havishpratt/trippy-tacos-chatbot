@@ -15,8 +15,7 @@ export const vectorStore = new SupabaseVectorStore(embeddings, {
   queryName: "match_reviews", // The RPC function from migration.sql
 });
 
-// Retriever — pulls top 5 most similar review chunks
+// Retriever — pulls top 5 review chunks by cosine similarity
 export const retriever = vectorStore.asRetriever({
   k: 5,
-  searchType: "similarity",
 });

@@ -32,11 +32,16 @@ export default function ChatBot() {
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
 
+    console.log('All Messages: ' + JSON.stringify(messages));
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMessage }),
+        body: JSON.stringify({
+          message: userMessage,
+          history: messages,
+        }),
       });
 
       if (!res.ok) throw new Error("Chat request failed");

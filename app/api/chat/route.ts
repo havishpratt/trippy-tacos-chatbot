@@ -1,10 +1,6 @@
 import { NextRequest } from "next/server";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import {
-  ChatPromptTemplate,
-  SystemMessagePromptTemplate,
-  HumanMessagePromptTemplate,
-} from "@langchain/core/prompts";
+import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 import { retriever } from "@/lib/vectorstore";
 import type { Document } from "@langchain/core/documents";
 
@@ -33,14 +29,9 @@ const llm = new ChatGoogleGenerativeAI({
   apiKey: process.env.GOOGLE_API_KEY,
 });
 
-const prompt = ChatPromptTemplate.fromMessages([
-  SystemMessagePromptTemplate.fromTemplate(SYSTEM_PROMPT),
-  HumanMessagePromptTemplate.fromTemplate("{question}"),
-]);
-
 export async function POST(req: NextRequest) {
   try {
-    const { message } = await req.json();
+    const { message, history = [] } = await req.json();
 
     if (!message) {
       return new Response(JSON.stringify({ error: "Missing `message`" }), {
@@ -63,9 +54,24 @@ export async function POST(req: NextRequest) {
       console.log("=== END DEBUG ===\n");
     }
 
-    // Build prompt and get non-streaming response to avoid thinking duplication
-    const formattedPrompt = await prompt.invoke({ context, question: message });
-    const response = await llm.invoke(formattedPrompt);
+    // Build messages array with conversation history
+    const chatMessages = [
+      new SystemMessage(SYSTEM_PROMPT.replace("{context}", context)),
+    ];
+
+    // Add recent history (last 20 messages = ~10 exchanges)
+    const recentHistory = history.slice(-20);
+    for (const msg of recentHistory) {
+      if (msg.role === "user") {
+        chatMessages.push(new HumanMessage(msg.content));
+      } else {
+        chatMessages.push(new AIMessage(msg.content));
+      }
+    }
+
+    chatMessages.push(new HumanMessage(message));
+
+    const response = await llm.invoke(chatMessages);
 
     // Extract text content, filtering out any thinking blocks
     let text: string;
