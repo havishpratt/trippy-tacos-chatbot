@@ -20,6 +20,22 @@ import { vectorStore } from "@/lib/vectorstore";
  *
  * For V1: copy-paste reviews into this format and POST.
  */
+
+function prependReviewAttribution(review: {
+  text: string;
+  source?: string;
+  rating?: number | null;
+  date?: string | null;
+  reviewer?: string | null;
+}): string {
+  const reviewer = review.reviewer?.trim() || "anonymous";
+  const date = review.date || "unknown date";
+  const ratingLabel =
+    review.rating == null ? "unrated" : String(review.rating);
+  const source = review.source || "unknown";
+  return `[Review by ${reviewer} on ${date} — ${ratingLabel}★ via ${source}]\n\n${review.text}`;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { reviews } = await req.json();
@@ -31,18 +47,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Splitter — reviews are short so use small chunks
-    // Most reviews fit in one chunk, but long ones get split
+    // Larger chunks keep most reviews whole; attribution prefix makes splits self-contained
     const splitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 500,
-      chunkOverlap: 50,
+      chunkSize: 2000,
+      chunkOverlap: 200,
     });
 
     const docs = [];
 
     for (const review of reviews) {
+      const textWithTag = prependReviewAttribution(review);
       const chunks = await splitter.createDocuments(
-        [review.text],
+        [textWithTag],
         [
           {
             source: review.source || "unknown",

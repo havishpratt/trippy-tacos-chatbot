@@ -27,13 +27,13 @@ Database setup: run migrations via `supabase db push` or execute `supabase/migra
 ## Architecture
 
 ```
-POST /api/ingest → chunk reviews (RecursiveCharacterTextSplitter, 500/50) → embed (Google gemini-embedding-001) → store in Supabase `reviews` table
+POST /api/ingest → chunk reviews (RecursiveCharacterTextSplitter, 2000/200, with reviewer/date tag prepended) → embed (Google gemini-embedding-001) → store in Supabase `reviews` table
 
-POST /api/chat → embed user query → similarity search (top-5 via match_reviews RPC) → inject context into system prompt → invoke Gemini 2.5 Flash response
+POST /api/chat → embed user query → similarity search (top-10 via match_reviews RPC) → inject context into system prompt → invoke Gemini 2.5 Flash response
 ```
 
 - **lib/supabase.ts** — Supabase admin client (service role key, server-side only)
-- **lib/vectorstore.ts** — SupabaseVectorStore + GoogleGenerativeAIEmbeddings + retriever (k=5)
+- **lib/vectorstore.ts** — SupabaseVectorStore + GoogleGenerativeAIEmbeddings + retriever (k=10)
 - **app/api/chat/route.ts** — Retrieves relevant chunks, injects into system prompt, returns non-streaming Gemini 2.5 Flash response
 - **app/api/ingest/route.ts** — Accepts `{ reviews: [...] }`, chunks and embeds into pgvector
 - **components/ChatBot.tsx** — Client component, sends message and displays plain text response
@@ -45,3 +45,4 @@ POST /api/chat → embed user query → similarity search (top-5 via match_revie
 - Chat uses Gemini 2.5 Flash via direct `ChatPromptTemplate` + `llm.invoke()` (non-streaming to avoid thinking mode duplication).
 - Response is returned via non-streaming `invoke`, not streaming.
 - Review metadata (source, rating, date, reviewer, location) is stored in a JSONB column and the `match_reviews` RPC supports JSONB `@>` filtering.
+- Each review is prepended with a [Review by X on Y] tag before chunking so chunks are self-contained and citable.
