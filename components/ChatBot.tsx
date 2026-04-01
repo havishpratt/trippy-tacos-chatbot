@@ -44,7 +44,11 @@ export default function ChatBot() {
         }),
       });
 
-      if (!res.ok) throw new Error("Chat request failed");
+      if (!res.ok) {
+        const errBody = await res.text();
+        console.error("Chat API error:", res.status, errBody);
+        throw new Error("Chat request failed");
+      }
 
       const text = await res.text();
       setMessages((prev) => [...prev, { role: "assistant", content: text }]);
