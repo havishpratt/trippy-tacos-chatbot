@@ -281,6 +281,21 @@ body {
   padding: 0;
 }
 
+.citation-link {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0 2px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.citation-link:hover {
+  background: var(--accent);
+  color: white;
+}
+
 .citation-line-index {
   color: var(--accent);
   font-weight: 600;
@@ -288,6 +303,25 @@ body {
 
 .citation-line-body {
   color: var(--muted);
+}
+
+.citation-line {
+  scroll-margin-top: 8px;
+}
+
+.citation-line-link {
+  text-decoration: none;
+  color: inherit;
+  display: inline;
+  transition: opacity 0.15s;
+}
+
+.citation-line-link:hover {
+  opacity: 0.75;
+}
+
+.citation-line-link:hover .citation-line-index {
+  text-decoration: underline;
 }
 
 /* ── Loading Dots ── */

@@ -9,6 +9,7 @@ type MessageSource = {
   date: string | null;
   source: string;
   rating: number | null;
+  url: string | null;
 };
 
 interface Message {
@@ -35,6 +36,7 @@ function parseMessageSources(raw: unknown): MessageSource[] | undefined {
             : null,
       source: typeof s.source === "string" ? s.source : "unknown",
       rating: typeof s.rating === "number" ? s.rating : null,
+      url: typeof s.url === "string" ? s.url : null,
     });
   }
   return out.length > 0 ? out : undefined;
@@ -46,6 +48,11 @@ function getReferencedSourceIndices(text: string): Set<number> {
     indices.add(Number(m[1]));
   }
   return indices;
+}
+
+/** Convert bare [N] citations into markdown links targeting the footer anchor */
+function linkifyCitations(text: string, msgId: number): string {
+  return text.replace(/\[(\d+)\]/g, (_, n) => `[\\[${n}\\]](#cite-${msgId}-${n})`);
 }
 
 export default function ChatBot() {
@@ -197,23 +204,83 @@ export default function ChatBot() {
                             {children}
                           </blockquote>
                         ),
+                        a: ({ href, children }) => {
+                          if (href?.startsWith("#cite-")) {
+                            // Extract the citation index from href like "#cite-2-3" → 3
+                            const citeIdx = Number(href.split("-").pop());
+                            const src = msg.sources?.find(
+                              (s) => s.index === citeIdx
+                            );
+                            if (src?.url) {
+                              return (
+                                <a
+                                  href={src.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="citation-link"
+                                >
+                                  {children}
+                                </a>
+                              );
+                            }
+                            return (
+                              <a
+                                href={href}
+                                className="citation-link"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  document
+                                    .getElementById(href.slice(1))
+                                    ?.scrollIntoView({ behavior: "smooth" });
+                                }}
+                              >
+                                {children}
+                              </a>
+                            );
+                          }
+                          return <a href={href}>{children}</a>;
+                        },
                       }}
                     >
-                      {msg.content}
+                      {linkifyCitations(msg.content, i)}
                     </ReactMarkdown>
                     {showCitationFooter && (
                       <div className="citations-footer" aria-label="Sources">
                         <ul className="citations-footer-list">
                           {citedSources.map((s) => (
-                            <li key={s.index} className="citation-line">
-                              <span className="citation-line-index">
-                                [{s.index}]
-                              </span>{" "}
-                              <span className="citation-line-body">
-                                {s.reviewer}
-                                {s.date != null ? ` — ${s.date}` : ""} (via{" "}
-                                {s.source})
-                              </span>
+                            <li
+                              key={s.index}
+                              id={`cite-${i}-${s.index}`}
+                              className="citation-line"
+                            >
+                              {s.url ? (
+                                <a
+                                  href={s.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="citation-line-link"
+                                >
+                                  <span className="citation-line-index">
+                                    [{s.index}]
+                                  </span>{" "}
+                                  <span className="citation-line-body">
+                                    {s.reviewer}
+                                    {s.date != null ? ` — ${s.date}` : ""} (via{" "}
+                                    {s.source})
+                                  </span>
+                                </a>
+                              ) : (
+                                <>
+                                  <span className="citation-line-index">
+                                    [{s.index}]
+                                  </span>{" "}
+                                  <span className="citation-line-body">
+                                    {s.reviewer}
+                                    {s.date != null ? ` — ${s.date}` : ""} (via{" "}
+                                    {s.source})
+                                  </span>
+                                </>
+                              )}
                             </li>
                           ))}
                         </ul>

@@ -16,6 +16,7 @@ type IngestReview = {
   date?: string | null;
   reviewer?: string | null;
   location?: string | null;
+  url?: string | null;
 };
 
 /**
@@ -72,6 +73,7 @@ async function processReviewBatch(
         date: review.date || null,
         reviewer: review.reviewer || "anonymous",
         location: review.location || null,
+        url: review.url || null,
         sentiment: extracted.sentiment,
         items_mentioned: extracted.items_mentioned,
         issues: extracted.issues,

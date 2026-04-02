@@ -10,10 +10,25 @@ type ChatSource = {
   date: string | null;
   source: string;
   rating: number | null;
+  url: string | null;
 };
+
+const YELP_BIZ_URL = "https://www.yelp.com/biz/trippy-tacos-silver-spring-7";
 
 const formatNumberedContext = (docs: Document[]): string =>
   docs.map((doc, i) => `[${i + 1}] ${doc.pageContent}`).join("\n\n");
+
+function buildYelpFallbackUrl(doc: Document): string {
+  const m = (doc.metadata || {}) as Record<string, unknown>;
+  const items = Array.isArray(m.items_mentioned) ? m.items_mentioned : [];
+  const keywords = items
+    .filter((x): x is string => typeof x === "string" && x.trim() !== "")
+    .slice(0, 3);
+
+  if (keywords.length === 0) return YELP_BIZ_URL;
+  const q = encodeURIComponent(keywords.join(" "));
+  return `${YELP_BIZ_URL}?q=${q}`;
+}
 
 function buildSourcesFromDocs(docs: Document[]): ChatSource[] {
   return docs.map((doc, i) => {
@@ -37,12 +52,18 @@ function buildSourcesFromDocs(docs: Document[]): ChatSource[] {
       typeof m.rating === "number" && !Number.isNaN(m.rating)
         ? m.rating
         : null;
+    const urlRaw = m.url;
+    const url =
+      typeof urlRaw === "string" && urlRaw.trim() !== ""
+        ? urlRaw.trim()
+        : buildYelpFallbackUrl(doc);
     return {
       index: i + 1,
       reviewer,
       date,
       source,
       rating,
+      url,
     };
   });
 }
