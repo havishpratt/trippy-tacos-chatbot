@@ -3,8 +3,11 @@ import { test, expect } from "@playwright/test";
 test.describe("Chatbot UI", () => {
   test("renders the chat interface", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("Trippy Tacos — Review Insights")).toBeVisible();
-    await expect(page.getByPlaceholder("What do customers say about...")).toBeVisible();
+    await expect(page.getByText("Trippy Tacos")).toBeVisible();
+    await expect(page.getByText("Review Insights")).toBeVisible();
+    await expect(
+      page.getByPlaceholder("Ask about Trippy Tacos reviews...")
+    ).toBeVisible();
     await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
   });
 
@@ -15,20 +18,26 @@ test.describe("Chatbot UI", () => {
 
   test("send button is enabled when input has text", async ({ page }) => {
     await page.goto("/");
-    await page.getByPlaceholder("What do customers say about...").fill("hello");
+    await page
+      .getByPlaceholder("Ask about Trippy Tacos reviews...")
+      .fill("hello");
     await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
   });
 
   test("shows user message after sending", async ({ page }) => {
     await page.goto("/");
-    await page.getByPlaceholder("What do customers say about...").fill("hello");
+    await page
+      .getByPlaceholder("Ask about Trippy Tacos reviews...")
+      .fill("hello");
     await page.getByRole("button", { name: "Send" }).click();
     await expect(page.getByText("hello")).toBeVisible();
   });
 
   test("receives a response from the chatbot", async ({ page }) => {
     await page.goto("/");
-    await page.getByPlaceholder("What do customers say about...").fill("what are the most popular menu items?");
+    await page
+      .getByPlaceholder("Ask about Trippy Tacos reviews...")
+      .fill("what are the most popular menu items?");
     await page.getByRole("button", { name: "Send" }).click();
 
     // Wait for assistant response (up to 15s for API call)
@@ -38,7 +47,9 @@ test.describe("Chatbot UI", () => {
 
   test("response has no duplicated text", async ({ page }) => {
     await page.goto("/");
-    await page.getByPlaceholder("What do customers say about...").fill("how is the service?");
+    await page
+      .getByPlaceholder("Ask about Trippy Tacos reviews...")
+      .fill("how is the service?");
     await page.getByRole("button", { name: "Send" }).click();
 
     // Wait for response

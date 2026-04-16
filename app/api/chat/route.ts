@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import type { BaseMessage } from "@langchain/core/messages";
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
-import { retriever } from "@/lib/vectorstore";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import type { Document } from "@langchain/core/documents";
+import { retriever } from "@/lib/vectorstore";
 
 type ChatSource = {
   index: number;
@@ -13,10 +14,18 @@ type ChatSource = {
   url: string | null;
 };
 
+<<<<<<< HEAD
 const YELP_BIZ_URL = "https://www.yelp.com/biz/trippy-tacos-silver-spring-7";
 
 const formatNumberedContext = (docs: Document[]): string =>
   docs.map((doc, i) => `[${i + 1}] ${doc.pageContent}`).join("\n\n");
+=======
+/** Chunk labels avoid [n] brackets so the model is less likely to echo them in replies. */
+const formatReviewContext = (docs: Document[]): string =>
+  docs
+    .map((doc, i) => `Review excerpt ${i + 1}:\n${doc.pageContent}`)
+    .join("\n\n");
+>>>>>>> 2450031694f4783d4f071a526c47649fb4cdfff6
 
 function buildYelpFallbackUrl(doc: Document): string {
   const m = (doc.metadata || {}) as Record<string, unknown>;
@@ -72,16 +81,16 @@ const SYSTEM_PROMPT = `You are a smart business assistant for Trippy Tacos, a fo
 
 Your job is to analyze customer reviews and provide clear, actionable insights. Don't just quote reviews back. Instead:
 
-- Synthesize patterns across reviews. "4 out of 5 reviewers praised the birria" is better than listing each one.
+- Synthesize patterns across reviews. Summarizing that many reviewers praised the birria is better than listing each one.
 - Be actionable: what's working, what needs fixing, what to prioritize.
-- Quantify when possible: numbers and proportions over vague summaries.
+- Never use specific percentages or fractions like "60% of reviews" or "7 out of 10 reviews". Instead use natural language like "many", "several", "a few", "some", "most", or "a couple of" to describe how common something is.
 - Flag recurring complaints as risks.
 - Be direct and concise. Owners are busy.
 - If the reviews don't contain enough info, say so. Never make up data.
 
-If the user sends a casual message (greeting, small talk, off-topic), respond briefly and naturally — don't force an analysis. Only analyze reviews when the user asks a question about their business, feedback, or menu.
+- Do NOT include citation numbers like [1], [2], [3] in your response text. Just write naturally without any bracketed references. The system will automatically show which reviewers were referenced.
 
-When referencing specific reviews, cite them using [1], [2], etc. corresponding to the numbered reviews in the context. Only cite reviews you actually reference.
+If the user sends a casual message (greeting, small talk, off-topic), respond briefly and naturally — don't force an analysis. Only analyze reviews when the user asks a question about their business, feedback, or menu.
 
 Context from customer reviews:
 {context}`;
@@ -91,6 +100,24 @@ const llm = new ChatGoogleGenerativeAI({
   temperature: 0.3,
   apiKey: process.env.GOOGLE_API_KEY,
 });
+
+function extractAssistantText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter(
+        (part): part is { type: "text"; text: string } =>
+          typeof part === "object" &&
+          part !== null &&
+          "type" in part &&
+          (part as { type?: string }).type === "text" &&
+          typeof (part as { text?: unknown }).text === "string"
+      )
+      .map((part) => part.text)
+      .join("");
+  }
+  return String(content);
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -103,27 +130,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Retrieve relevant reviews
     const docs = await retriever.invoke(message);
     const sources = buildSourcesFromDocs(docs);
-    const context = formatNumberedContext(docs);
+    const context = formatReviewContext(docs);
 
-    if (process.env.NODE_ENV === "development") {
-      console.log("\n=== RAG DEBUG ===");
-      console.log("User message:", message);
-      console.log("Retrieved", docs.length, "chunks:");
-      docs.forEach((doc, i) =>
-        console.log(`  [${i}] ${doc.pageContent.slice(0, 100)}...`)
-      );
-      console.log("=== END DEBUG ===\n");
-    }
-
-    // Build messages array with conversation history
-    const chatMessages = [
+    const chatMessages: BaseMessage[] = [
       new SystemMessage(SYSTEM_PROMPT.replace("{context}", context)),
     ];
 
-    // Add recent history (last 20 messages = ~10 exchanges)
     const recentHistory = history.slice(-20);
     for (const msg of recentHistory) {
       if (msg.role === "user") {
@@ -136,28 +150,18 @@ export async function POST(req: NextRequest) {
     chatMessages.push(new HumanMessage(message));
 
     const response = await llm.invoke(chatMessages);
-
-    // Extract text content, filtering out any thinking blocks
-    let text: string;
-    if (typeof response.content === "string") {
-      text = response.content;
-    } else if (Array.isArray(response.content)) {
-      text = response.content
-        .filter((part: any) => part.type === "text")
-        .map((part: any) => part.text)
-        .join("");
-    } else {
-      text = String(response.content);
-    }
+    const text = extractAssistantText(response.content);
 
     const body = JSON.stringify({ text, sources });
     return new Response(body, {
       headers: { "Content-Type": "application/json; charset=utf-8" },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errMsg =
+      error instanceof Error ? error.message : "Chat failed";
     console.error("Chat error:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Chat failed" }),
+      JSON.stringify({ error: errMsg }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

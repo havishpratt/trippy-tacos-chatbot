@@ -42,8 +42,15 @@ function extractTextFromLlmContent(content: unknown): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
     return content
-      .filter((part: { type?: string }) => part.type === "text")
-      .map((part: { text?: string }) => part.text ?? "")
+      .filter(
+        (part): part is { type: "text"; text: string } =>
+          typeof part === "object" &&
+          part !== null &&
+          "type" in part &&
+          (part as { type?: string }).type === "text" &&
+          typeof (part as { text?: unknown }).text === "string"
+      )
+      .map((part) => part.text)
       .join("");
   }
   return String(content);

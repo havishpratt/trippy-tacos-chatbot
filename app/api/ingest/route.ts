@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Document } from "@langchain/core/documents";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import {
-  DEFAULT_REVIEW_EXTRACTED_METADATA,
-  extractReviewMetadata,
-} from "@/lib/extract-metadata";
+  processAllReviewBatches,
+  type IngestReview,
+} from "@/lib/ingest-pipeline";
 import { vectorStore } from "@/lib/vectorstore";
 
+<<<<<<< HEAD
 const INGEST_BATCH_SIZE = 5;
 
 type IngestReview = {
@@ -19,6 +19,8 @@ type IngestReview = {
   url?: string | null;
 };
 
+=======
+>>>>>>> 2450031694f4783d4f071a526c47649fb4cdfff6
 /**
  * POST /api/ingest
  *
@@ -38,6 +40,7 @@ type IngestReview = {
  * For V1: copy-paste reviews into this format and POST.
  */
 
+<<<<<<< HEAD
 function prependReviewAttribution(review: IngestReview): string {
   const reviewer = review.reviewer?.trim() || "anonymous";
   const date = review.date || "unknown date";
@@ -88,6 +91,8 @@ async function processReviewBatch(
   return chunkGroups.flat();
 }
 
+=======
+>>>>>>> 2450031694f4783d4f071a526c47649fb4cdfff6
 export async function POST(req: NextRequest) {
   try {
     const { reviews } = await req.json();
@@ -105,13 +110,10 @@ export async function POST(req: NextRequest) {
       chunkOverlap: 200,
     });
 
-    const docs: Document[] = [];
-
-    for (let i = 0; i < reviews.length; i += INGEST_BATCH_SIZE) {
-      const batch = reviews.slice(i, i + INGEST_BATCH_SIZE) as IngestReview[];
-      const batchDocs = await processReviewBatch(splitter, batch);
-      docs.push(...batchDocs);
-    }
+    const docs = await processAllReviewBatches(
+      splitter,
+      reviews as IngestReview[]
+    );
 
     // Embed and store all chunks
     await vectorStore.addDocuments(docs);
@@ -121,11 +123,10 @@ export async function POST(req: NextRequest) {
       chunksStored: docs.length,
       reviewsProcessed: reviews.length,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Ingest failed";
     console.error("Ingest error:", error);
-    return NextResponse.json(
-      { error: error.message || "Ingest failed" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
