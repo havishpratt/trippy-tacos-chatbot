@@ -48,14 +48,6 @@ function parseMessageSources(raw: unknown): MessageSource[] | undefined {
   return out.length > 0 ? out : undefined;
 }
 
-function getReferencedSourceIndices(text: string): Set<number> {
-  const indices = new Set<number>();
-  for (const m of text.matchAll(/\[(\d+)\]/g)) {
-    indices.add(Number(m[1]));
-  }
-  return indices;
-}
-
 export default function ChatBot() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -174,17 +166,11 @@ export default function ChatBot() {
         )}
 
         {messages.map((msg, i) => {
-          const refIndices =
-            msg.role === "assistant"
-              ? getReferencedSourceIndices(msg.content)
-              : new Set<number>();
-          const citedSources =
-            msg.role === "assistant" && msg.sources
+          const allSources =
+            msg.role === "assistant" && msg.sources?.length
               ? msg.sources
-                  .filter((s) => refIndices.has(s.index))
-                  .sort((a, b) => a.index - b.index)
               : [];
-          const showCitationFooter = citedSources.length > 0;
+          const showCitationFooter = allSources.length > 0;
 
           return (
             <div
@@ -262,20 +248,14 @@ export default function ChatBot() {
                     </ReactMarkdown>
                     {showCitationFooter && (
                       <div className="citations-footer" aria-label="Sources">
-                        <ul className="citations-footer-list">
-                          {citedSources.map((s) => (
-                            <li key={s.index} className="citation-line">
-                              <span className="citation-line-index">
-                                [{s.index}]
-                              </span>{" "}
-                              <span className="citation-line-body">
-                                {s.reviewer}
-                                {s.date != null ? ` — ${s.date}` : ""} (via{" "}
-                                {s.source})
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
+                        <span className="citation-sources-label">Sources:</span>{" "}
+                        {allSources.map((s, idx) => (
+                          <span key={`${s.index}-${idx}`}>
+                            {idx > 0 ? ", " : null}
+                            <span className="citation-name">{s.reviewer}</span>
+                          </span>
+                        ))}
+                        <span className="citations-footer-end">.</span>
                       </div>
                     )}
                   </>

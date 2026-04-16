@@ -440,27 +440,18 @@ body {
   color: #6b7280;
 }
 
-.citations-footer-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.citation-line {
-  margin: 0;
-  padding: 0;
-}
-
-.citation-line-index {
-  color: var(--tt-pink);
+.citation-sources-label {
   font-weight: 600;
+  color: var(--tt-muted);
 }
 
-.citation-line-body {
-  color: var(--tt-muted);
+.citation-name {
+  font-weight: 400;
+  color: var(--tt-text);
+}
+
+.citations-footer-end {
+  color: var(--tt-text);
 }
 
 /* ── Typing indicator ── */

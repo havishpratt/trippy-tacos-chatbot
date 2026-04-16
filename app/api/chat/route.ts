@@ -13,8 +13,11 @@ type ChatSource = {
   rating: number | null;
 };
 
-const formatNumberedContext = (docs: Document[]): string =>
-  docs.map((doc, i) => `[${i + 1}] ${doc.pageContent}`).join("\n\n");
+/** Chunk labels avoid [n] brackets so the model is less likely to echo them in replies. */
+const formatReviewContext = (docs: Document[]): string =>
+  docs
+    .map((doc, i) => `Review excerpt ${i + 1}:\n${doc.pageContent}`)
+    .join("\n\n");
 
 function buildSourcesFromDocs(docs: Document[]): ChatSource[] {
   return docs.map((doc, i) => {
@@ -52,16 +55,16 @@ const SYSTEM_PROMPT = `You are a smart business assistant for Trippy Tacos, a fo
 
 Your job is to analyze customer reviews and provide clear, actionable insights. Don't just quote reviews back. Instead:
 
-- Synthesize patterns across reviews. "4 out of 5 reviewers praised the birria" is better than listing each one.
+- Synthesize patterns across reviews. Summarizing that many reviewers praised the birria is better than listing each one.
 - Be actionable: what's working, what needs fixing, what to prioritize.
-- Quantify when possible: numbers and proportions over vague summaries.
+- Never use specific percentages or fractions like "60% of reviews" or "7 out of 10 reviews". Instead use natural language like "many", "several", "a few", "some", "most", or "a couple of" to describe how common something is.
 - Flag recurring complaints as risks.
 - Be direct and concise. Owners are busy.
 - If the reviews don't contain enough info, say so. Never make up data.
 
-If the user sends a casual message (greeting, small talk, off-topic), respond briefly and naturally — don't force an analysis. Only analyze reviews when the user asks a question about their business, feedback, or menu.
+- Do NOT include citation numbers like [1], [2], [3] in your response text. Just write naturally without any bracketed references. The system will automatically show which reviewers were referenced.
 
-When referencing specific reviews, cite them using [1], [2], etc. corresponding to the numbered reviews in the context. Only cite reviews you actually reference.
+If the user sends a casual message (greeting, small talk, off-topic), respond briefly and naturally — don't force an analysis. Only analyze reviews when the user asks a question about their business, feedback, or menu.
 
 Context from customer reviews:
 {context}`;
@@ -103,7 +106,7 @@ export async function POST(req: NextRequest) {
 
     const docs = await retriever.invoke(message);
     const sources = buildSourcesFromDocs(docs);
-    const context = formatNumberedContext(docs);
+    const context = formatReviewContext(docs);
 
     const chatMessages: BaseMessage[] = [
       new SystemMessage(SYSTEM_PROMPT.replace("{context}", context)),
