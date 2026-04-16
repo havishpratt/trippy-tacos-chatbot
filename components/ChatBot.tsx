@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import ReactMarkdown from "react-markdown";
 
 type MessageSource = {
@@ -16,6 +17,13 @@ interface Message {
   content: string;
   sources?: MessageSource[];
 }
+
+const SUGGESTED_QUESTIONS = [
+  "What are the most popular menu items?",
+  "What do customers complain about?",
+  "Tell me about the birria tacos",
+  "How is the service overall?",
+];
 
 function parseMessageSources(raw: unknown): MessageSource[] | undefined {
   if (!Array.isArray(raw)) return undefined;
@@ -63,13 +71,12 @@ export default function ChatBot() {
     inputRef.current?.focus();
   }, [isLoading]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+  async function sendChat(userMessage: string) {
+    const trimmed = userMessage.trim();
+    if (!trimmed || isLoading) return;
 
-    const userMessage = input.trim();
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+    setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
     setIsLoading(true);
 
     try {
@@ -77,7 +84,7 @@ export default function ChatBot() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: userMessage,
+          message: trimmed,
           history: messages,
         }),
       });
@@ -111,26 +118,58 @@ export default function ChatBot() {
     }
   }
 
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    void sendChat(input);
+  }
+
   return (
     <div className="chat-container">
-      {/* Header */}
       <header className="chat-header">
-        <div className="header-icon">🌮</div>
-        <div>
-          <h1 className="header-title">Trippy Tacos</h1>
-          <p className="header-subtitle">Review Insights</p>
+        <div className="header-brand">
+          <div className="header-logo-wrap">
+            <Image
+              src="/trippy-tacos-logo.png"
+              alt="Trippy Tacos"
+              width={160}
+              height={48}
+              className="header-logo-img"
+              priority
+            />
+          </div>
+          <div>
+            <h1 className="header-title">Trippy Tacos</h1>
+            <p className="header-subtitle">Review Insights</p>
+          </div>
         </div>
       </header>
 
-      {/* Messages */}
       <div className="chat-messages">
         {messages.length === 0 && (
           <div className="empty-state">
-            <div className="empty-icon">📊</div>
-            <p className="empty-title">What do your customers think?</p>
-            <p className="empty-hint">
-              Ask about reviews, sentiment, menu items, or feedback trends.
-            </p>
+            <div className="empty-state-logo-wrap">
+              <Image
+                src="/trippy-tacos-logo.png"
+                alt="Trippy Tacos"
+                width={240}
+                height={96}
+                className="empty-state-logo-img"
+                priority
+              />
+            </div>
+            <p className="empty-title">What would you like to know?</p>
+            <div className="suggestion-pills">
+              {SUGGESTED_QUESTIONS.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  className="suggestion-pill"
+                  onClick={() => void sendChat(q)}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -153,7 +192,18 @@ export default function ChatBot() {
               className={`message ${msg.role === "user" ? "message-user" : "message-assistant"}`}
             >
               {msg.role === "assistant" && (
-                <div className="assistant-avatar">🌮</div>
+                <div className="assistant-avatar">
+                  <img
+                    src="/trippy-tacos-logo.png"
+                    alt="Trippy Tacos"
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      objectFit: "contain",
+                    }}
+                  />
+                </div>
               )}
               <div
                 className={`message-bubble ${msg.role === "user" ? "bubble-user" : "bubble-assistant"}${
@@ -169,6 +219,16 @@ export default function ChatBot() {
                         ),
                         strong: ({ children }) => (
                           <strong className="md-strong">{children}</strong>
+                        ),
+                        a: ({ href, children }) => (
+                          <a
+                            href={href}
+                            className="md-a"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {children}
+                          </a>
                         ),
                         ul: ({ children }) => (
                           <ul className="md-ul">{children}</ul>
@@ -229,11 +289,29 @@ export default function ChatBot() {
 
         {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
           <div className="message message-assistant">
-            <div className="assistant-avatar">🌮</div>
-            <div className="bubble-assistant loading-bubble">
-              <span className="dot" />
-              <span className="dot" />
-              <span className="dot" />
+            <div className="assistant-avatar">
+              <img
+                src="/trippy-tacos-logo.png"
+                alt="Trippy Tacos"
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  objectFit: "contain",
+                }}
+              />
+            </div>
+            <div className="bubble-assistant">
+              <div
+                className="typing-indicator"
+                role="status"
+                aria-live="polite"
+                aria-label="Assistant is typing"
+              >
+                <span />
+                <span />
+                <span />
+              </div>
             </div>
           </div>
         )}
@@ -241,14 +319,13 @@ export default function ChatBot() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <form onSubmit={handleSubmit} className="chat-input-bar">
         <input
           ref={inputRef}
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="What do customers say about..."
+          placeholder="Ask about Trippy Tacos reviews..."
           disabled={isLoading}
           className="chat-input"
         />

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans, Fraunces } from "next/font/google";
+import { DM_Sans, Fredoka } from "next/font/google";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -8,10 +8,10 @@ const dmSans = DM_Sans({
   weight: ["400", "500", "600", "700"],
 });
 
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+const fredoka = Fredoka({
+  variable: "--font-fredoka",
   subsets: ["latin"],
-  weight: ["600", "700", "800"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -25,7 +25,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${fraunces.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${dmSans.variable} ${fredoka.variable} h-full antialiased`}
+    >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
