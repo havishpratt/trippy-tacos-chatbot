@@ -3,7 +3,8 @@ import { test, expect } from "@playwright/test";
 test.describe("Chatbot UI", () => {
   test("renders the chat interface", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("Trippy Tacos — Review Insights")).toBeVisible();
+    await expect(page.getByText("Trippy Tacos")).toBeVisible();
+    await expect(page.getByText("Review Insights")).toBeVisible();
     await expect(page.getByPlaceholder("What do customers say about...")).toBeVisible();
     await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
   });

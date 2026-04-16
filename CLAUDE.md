@@ -14,36 +14,75 @@ npm run dev          # Next.js dev server on :3000
 npm run test         # Playwright e2e tests
 npm run lint         # ESLint
 
-# Ingest reviews
+# Ingest reviews (manual JSON)
 curl -X POST http://localhost:3000/api/ingest \
   -H "Content-Type: application/json" \
   -d @yelp-reviews.json
 ```
 
-Requires `.env.local` with: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_API_KEY`.
+## Environment variables
+
+Set these in `.env.local`:
+
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-side admin (ingest, vector writes) |
+| `GOOGLE_API_KEY` | Gemini chat, embeddings (`gemini-embedding-001`), metadata extraction |
+| `APIFY_API_TOKEN` | Apify actors for Google Maps and Yelp review scrapers |
+| `GOOGLE_MAPS_PLACE_URL` | Google Maps place URL for `/api/sync/google` |
+| `YELP_BUSINESS_URL` | Yelp business page URL for `/api/sync/yelp` |
+| `CRON_SECRET` | Shared secret; protected routes expect `Authorization: Bearer <CRON_SECRET>` |
 
 Database setup: run migrations via `supabase db push` or execute `supabase/migrations/` SQL files in the Supabase SQL Editor.
 
 ## Architecture
 
 ```
-POST /api/ingest → per review: LLM metadata extraction (Gemini 2.5 Flash — sentiment, items_mentioned, issues, price_mentions, language) → chunk (RecursiveCharacterTextSplitter, 2000/200, with reviewer/date tag prepended) → embed (Google gemini-embedding-001) → store in Supabase `reviews` table
+POST /api/ingest → processAllReviewBatches (batch size 2, 15s pause between batches) → per review: Gemini metadata extraction → chunk (2000/200, attribution tag) → embed → Supabase `reviews`
 
-POST /api/chat → embed user query → similarity search (top-10 via match_reviews RPC) → inject context into system prompt → invoke Gemini 2.5 Flash response
+POST /api/chat → query embedding → match_reviews (k=10) → Gemini 2.5 Flash → JSON { text, sources }
+
+POST /api/sync/google → Apify Google Maps scraper → dedupe → ingest pipeline → batched vector writes (lib/store-review-chunks.ts)
+
+POST /api/sync/yelp → Apify Yelp scraper → dedupe → ingest pipeline → batched vector writes
+
+POST /api/sync → sequentially calls internal /api/sync/google then /api/sync/yelp (same Bearer token); returns { google, yelp }
 ```
 
-- **lib/supabase.ts** — Supabase admin client (service role key, server-side only)
-- **lib/vectorstore.ts** — SupabaseVectorStore + GoogleGenerativeAIEmbeddings + retriever (k=10)
-- **lib/extract-metadata.ts** — `extractReviewMetadata`: Gemini 2.5 Flash (temperature 0) returns structured fields for ingest
-- **app/api/chat/route.ts** — Retrieves relevant chunks, injects into system prompt, returns non-streaming Gemini 2.5 Flash response
-- **app/api/ingest/route.ts** — Accepts `{ reviews: [...] }`; sequentially extracts metadata per review, merges into chunk JSONB, embeds into pgvector
-- **components/ChatBot.tsx** — Client component, sends message and displays plain text response
-- **supabase/migrations/** — Creates `reviews` table (3072-dim vector), `match_reviews` RPC function, and `chat_sessions` table stub for V2
+### Sync endpoints (all require `Authorization: Bearer $CRON_SECRET`)
 
-## Key Details
+- **`/api/sync/google`** — Scrapes Google Maps reviews for `GOOGLE_MAPS_PLACE_URL`, dedupes by reviewer+date, ingests new rows.
+- **`/api/sync/yelp`** — Scrapes Yelp via Apify actor `tri_angle~yelp-review-scraper` for `YELP_BUSINESS_URL`. **Note:** Yelp often blocks or rate-limits automated scraping; the Apify actor may fail or return empty data depending on Yelp’s policies.
+- **`/api/sync`** — Runs Google sync then Yelp sync; response combines each child JSON body under `google` and `yelp`.
 
-- Embeddings are 3072 dimensions (Google gemini-embedding-001). The pgvector column and RPC function are hardcoded to this.
-- Chat uses Gemini 2.5 Flash via direct `ChatPromptTemplate` + `llm.invoke()` (non-streaming to avoid thinking mode duplication).
-- Response is returned via non-streaming `invoke`, not streaming.
-- Each row’s `metadata` JSONB column stores: **source**, **rating**, **date**, **reviewer**, **location** (from the ingest payload), plus **sentiment** (`positive` | `mixed` | `negative`), **items_mentioned** (string[]), **issues** (string[]), **price_mentions** (object mapping item keys to price strings), and **language** (e.g. `en`, `es`) from LLM extraction. The `match_reviews` RPC supports JSONB `@>` filtering on this object.
-- Each review is prepended with a [Review by X on Y] tag before chunking so chunks are self-contained and citable.
+### Key modules
+
+- **lib/supabase.ts** — Supabase admin client (service role, server-only)
+- **lib/vectorstore.ts** — SupabaseVectorStore + embeddings + retriever (k=10)
+- **lib/extract-metadata.ts** — `extractReviewMetadata` via Gemini 2.5 Flash (temperature 0)
+- **lib/ingest-pipeline.ts** — Attribution prefix, `extractReviewMetadata`, `RecursiveCharacterTextSplitter` (2000/200), batch size **2**, **15s delay** between metadata batches
+- **lib/dedup.ts** — `reviewKey`, `getExistingReviewKeys`, `isNewReview`
+- **lib/google-scraper.ts** — Apify Google Maps reviews (poll until complete)
+- **lib/yelp-scraper.ts** — Apify Yelp reviews (`run-sync-get-dataset-items`)
+- **lib/store-review-chunks.ts** — Batched `vectorStore.addDocuments` (20 per batch) with per-chunk retry on failure
+- **app/api/chat/route.ts** — RAG + Gemini response as JSON
+- **components/ChatBot.tsx** — Markdown + citation footer for `[n]` references
+
+## Metadata schema (JSONB per chunk)
+
+From ingest payload: **source**, **rating**, **date**, **reviewer**, **location**.
+
+From LLM extraction (Gemini): **sentiment** (`positive` | `mixed` | `negative`), **items_mentioned** (string[]), **issues** (string[]), **price_mentions** (object), **language** (e.g. `en`, `es`).
+
+The `match_reviews` RPC supports JSONB `@>` filtering on metadata.
+
+## Historical note
+
+For an initial corpus of **288 reviews**, metadata was bulk-extracted with **Claude** and updated **directly in Supabase** (bypassing the live ingest LLM path). Ongoing ingests use **Gemini** via `extractReviewMetadata` in `lib/ingest-pipeline.ts`.
+
+## Other details
+
+- Embeddings: **3072** dimensions (`gemini-embedding-001`); pgvector column and RPC match this.
+- Chat: non-streaming `invoke` to avoid duplicate thinking-mode output.
+- Review prefix before chunking: `[Review by {reviewer} on {date} — {rating}★ via {source}]` (with fallbacks for missing fields).

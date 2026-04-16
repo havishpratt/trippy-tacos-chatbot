@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import type { BaseMessage } from "@langchain/core/messages";
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
-import { retriever } from "@/lib/vectorstore";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import type { Document } from "@langchain/core/documents";
+import { retriever } from "@/lib/vectorstore";
 
 type ChatSource = {
   index: number;
@@ -71,6 +72,24 @@ const llm = new ChatGoogleGenerativeAI({
   apiKey: process.env.GOOGLE_API_KEY,
 });
 
+function extractAssistantText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter(
+        (part): part is { type: "text"; text: string } =>
+          typeof part === "object" &&
+          part !== null &&
+          "type" in part &&
+          (part as { type?: string }).type === "text" &&
+          typeof (part as { text?: unknown }).text === "string"
+      )
+      .map((part) => part.text)
+      .join("");
+  }
+  return String(content);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { message, history = [] } = await req.json();
@@ -82,27 +101,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Retrieve relevant reviews
     const docs = await retriever.invoke(message);
     const sources = buildSourcesFromDocs(docs);
     const context = formatNumberedContext(docs);
 
-    if (process.env.NODE_ENV === "development") {
-      console.log("\n=== RAG DEBUG ===");
-      console.log("User message:", message);
-      console.log("Retrieved", docs.length, "chunks:");
-      docs.forEach((doc, i) =>
-        console.log(`  [${i}] ${doc.pageContent.slice(0, 100)}...`)
-      );
-      console.log("=== END DEBUG ===\n");
-    }
-
-    // Build messages array with conversation history
-    const chatMessages = [
+    const chatMessages: BaseMessage[] = [
       new SystemMessage(SYSTEM_PROMPT.replace("{context}", context)),
     ];
 
-    // Add recent history (last 20 messages = ~10 exchanges)
     const recentHistory = history.slice(-20);
     for (const msg of recentHistory) {
       if (msg.role === "user") {
@@ -115,28 +121,18 @@ export async function POST(req: NextRequest) {
     chatMessages.push(new HumanMessage(message));
 
     const response = await llm.invoke(chatMessages);
-
-    // Extract text content, filtering out any thinking blocks
-    let text: string;
-    if (typeof response.content === "string") {
-      text = response.content;
-    } else if (Array.isArray(response.content)) {
-      text = response.content
-        .filter((part: any) => part.type === "text")
-        .map((part: any) => part.text)
-        .join("");
-    } else {
-      text = String(response.content);
-    }
+    const text = extractAssistantText(response.content);
 
     const body = JSON.stringify({ text, sources });
     return new Response(body, {
       headers: { "Content-Type": "application/json; charset=utf-8" },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errMsg =
+      error instanceof Error ? error.message : "Chat failed";
     console.error("Chat error:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Chat failed" }),
+      JSON.stringify({ error: errMsg }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

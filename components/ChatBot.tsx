@@ -72,8 +72,6 @@ export default function ChatBot() {
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
 
-    console.log('All Messages: ' + JSON.stringify(messages));
-
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -94,10 +92,11 @@ export default function ChatBot() {
       if (typeof data.text !== "string") {
         throw new Error("Invalid chat response");
       }
+      const assistantText = data.text;
       const sources = parseMessageSources(data.sources);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: data.text, sources },
+        { role: "assistant", content: assistantText, sources },
       ]);
     } catch {
       setMessages((prev) => [
@@ -255,6 +254,7 @@ export default function ChatBot() {
         />
         <button
           type="submit"
+          aria-label="Send"
           disabled={isLoading || !input.trim()}
           className="chat-send"
         >
