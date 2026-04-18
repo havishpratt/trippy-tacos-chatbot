@@ -16,6 +16,7 @@ export type IngestReview = {
   date?: string | null;
   reviewer?: string | null;
   location?: string | null;
+  url?: string | null;
 };
 
 export function prependReviewAttribution(review: IngestReview): string {
@@ -63,6 +64,7 @@ export async function processReviewBatch(
         date: review.date || "unknown",
         reviewer: review.reviewer || "anonymous",
         location: review.location || "",
+        url: review.url ?? null,
         sentiment: extracted.sentiment,
         items_mentioned: extracted.items_mentioned,
         issues: extracted.issues,

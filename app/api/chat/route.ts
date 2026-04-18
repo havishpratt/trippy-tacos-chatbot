@@ -14,18 +14,13 @@ type ChatSource = {
   url: string | null;
 };
 
-<<<<<<< HEAD
 const YELP_BIZ_URL = "https://www.yelp.com/biz/trippy-tacos-silver-spring-7";
 
-const formatNumberedContext = (docs: Document[]): string =>
-  docs.map((doc, i) => `[${i + 1}] ${doc.pageContent}`).join("\n\n");
-=======
 /** Chunk labels avoid [n] brackets so the model is less likely to echo them in replies. */
 const formatReviewContext = (docs: Document[]): string =>
   docs
     .map((doc, i) => `Review excerpt ${i + 1}:\n${doc.pageContent}`)
     .join("\n\n");
->>>>>>> 2450031694f4783d4f071a526c47649fb4cdfff6
 
 function buildYelpFallbackUrl(doc: Document): string {
   const m = (doc.metadata || {}) as Record<string, unknown>;
@@ -88,7 +83,7 @@ Your job is to analyze customer reviews and provide clear, actionable insights. 
 - Be direct and concise. Owners are busy.
 - If the reviews don't contain enough info, say so. Never make up data.
 
-- Do NOT include citation numbers like [1], [2], [3] in your response text. Just write naturally without any bracketed references. The system will automatically show which reviewers were referenced.
+- When your answer draws on a specific review, cite it inline with [1], [2], etc. matching the Review excerpt numbers. Only cite reviews you actually used. If your answer is general or no reviews were relevant, don't include any citations.
 
 If the user sends a casual message (greeting, small talk, off-topic), respond briefly and naturally — don't force an analysis. Only analyze reviews when the user asks a question about their business, feedback, or menu.
 

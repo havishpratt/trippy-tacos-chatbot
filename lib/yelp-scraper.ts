@@ -10,6 +10,8 @@ export interface YelpReviewItem {
   rating?: unknown;
   author_name?: string;
   author_location?: string;
+  reviewUrl?: string;
+  url?: string;
 }
 
 function getApifyToken(): string {
@@ -77,19 +79,27 @@ export async function scrapeYelpReviews(
   }
 
   const data = (await res.json()) as unknown;
-  if (Array.isArray(data)) {
-    return data as YelpReviewItem[];
-  }
-  if (
-    data !== null &&
-    typeof data === "object" &&
-    Array.isArray((data as { data?: unknown }).data)
-  ) {
-    return (data as { data: YelpReviewItem[] }).data;
-  }
-  throw new Error(
-    "Apify run-sync-get-dataset-items returned an unexpected JSON shape"
-  );
+
+  const items: YelpReviewItem[] = Array.isArray(data)
+    ? (data as YelpReviewItem[])
+    : data !== null &&
+        typeof data === "object" &&
+        Array.isArray((data as { data?: unknown }).data)
+      ? (data as { data: YelpReviewItem[] }).data
+      : (() => {
+          throw new Error(
+            "Apify run-sync-get-dataset-items returned an unexpected JSON shape"
+          );
+        })();
+
+  console.log("Yelp scrape: raw Apify response", {
+    status: res.status,
+    itemCount: items.length,
+    firstItemKeys: items[0] ? Object.keys(items[0]) : null,
+    firstItemSample: items[0] ?? null,
+  });
+
+  return items;
 }
 
 export function filterValidYelpReviews(items: YelpReviewItem[]): YelpReviewItem[] {
@@ -120,6 +130,7 @@ export function mapYelpReviewToIngestFormat(item: YelpReviewItem): IngestReview 
     date = formatYelpCreatedDate(item.created_date.trim());
   }
 
+  const rawUrl = item.reviewUrl ?? item.url;
   return {
     text: raw,
     source: "yelp",
@@ -133,5 +144,9 @@ export function mapYelpReviewToIngestFormat(item: YelpReviewItem): IngestReview 
       typeof item.author_location === "string"
         ? item.author_location.trim()
         : "",
+    url:
+      typeof rawUrl === "string" && rawUrl.trim() !== ""
+        ? rawUrl.trim()
+        : null,
   };
 }

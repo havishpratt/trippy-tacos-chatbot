@@ -6,21 +6,6 @@ import {
 } from "@/lib/ingest-pipeline";
 import { vectorStore } from "@/lib/vectorstore";
 
-<<<<<<< HEAD
-const INGEST_BATCH_SIZE = 5;
-
-type IngestReview = {
-  text: string;
-  source?: string;
-  rating?: number | null;
-  date?: string | null;
-  reviewer?: string | null;
-  location?: string | null;
-  url?: string | null;
-};
-
-=======
->>>>>>> 2450031694f4783d4f071a526c47649fb4cdfff6
 /**
  * POST /api/ingest
  *
@@ -40,59 +25,6 @@ type IngestReview = {
  * For V1: copy-paste reviews into this format and POST.
  */
 
-<<<<<<< HEAD
-function prependReviewAttribution(review: IngestReview): string {
-  const reviewer = review.reviewer?.trim() || "anonymous";
-  const date = review.date || "unknown date";
-  const ratingLabel =
-    review.rating == null ? "unrated" : String(review.rating);
-  const source = review.source || "unknown";
-  return `[Review by ${reviewer} on ${date} — ${ratingLabel}★ via ${source}]\n\n${review.text}`;
-}
-
-/**
- * Runs extractReviewMetadata + chunking for each review in parallel; returns all docs for the batch.
- */
-async function processReviewBatch(
-  splitter: RecursiveCharacterTextSplitter,
-  batch: IngestReview[]
-): Promise<Document[]> {
-  const chunkGroups = await Promise.all(
-    batch.map(async (review) => {
-      let extracted = DEFAULT_REVIEW_EXTRACTED_METADATA;
-      try {
-        extracted = await extractReviewMetadata(review.text);
-      } catch (err) {
-        console.warn(
-          "Ingest: extractReviewMetadata failed for a review; using default extraction fields.",
-          err
-        );
-      }
-
-      const textWithTag = prependReviewAttribution(review);
-      const metadata = {
-        source: review.source || "unknown",
-        rating: review.rating || null,
-        date: review.date || null,
-        reviewer: review.reviewer || "anonymous",
-        location: review.location || null,
-        url: review.url || null,
-        sentiment: extracted.sentiment,
-        items_mentioned: extracted.items_mentioned,
-        issues: extracted.issues,
-        price_mentions: extracted.price_mentions,
-        language: extracted.language,
-      };
-
-      return splitter.createDocuments([textWithTag], [metadata]);
-    })
-  );
-
-  return chunkGroups.flat();
-}
-
-=======
->>>>>>> 2450031694f4783d4f071a526c47649fb4cdfff6
 export async function POST(req: NextRequest) {
   try {
     const { reviews } = await req.json();

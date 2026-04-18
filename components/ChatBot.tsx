@@ -50,22 +50,21 @@ function parseMessageSources(raw: unknown): MessageSource[] | undefined {
   return out.length > 0 ? out : undefined;
 }
 
-<<<<<<< HEAD
-function getReferencedSourceIndices(text: string): Set<number> {
-  const indices = new Set<number>();
-  for (const m of text.matchAll(/\[(\d+)\]/g)) {
-    indices.add(Number(m[1]));
-  }
-  return indices;
-}
-
 /** Convert bare [N] citations into markdown links targeting the footer anchor */
 function linkifyCitations(text: string, msgId: number): string {
   return text.replace(/\[(\d+)\]/g, (_, n) => `[\\[${n}\\]](#cite-${msgId}-${n})`);
 }
 
-=======
->>>>>>> 2450031694f4783d4f071a526c47649fb4cdfff6
+/** Return the set of citation indices ([1], [2], …) referenced in the text */
+function getReferencedSourceIndices(text: string): Set<number> {
+  const indices = new Set<number>();
+  for (const match of text.matchAll(/\[(\d+)\]/g)) {
+    indices.add(Number(match[1]));
+  }
+  return indices;
+}
+
+
 export default function ChatBot() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -188,7 +187,11 @@ export default function ChatBot() {
             msg.role === "assistant" && msg.sources?.length
               ? msg.sources
               : [];
-          const showCitationFooter = allSources.length > 0;
+          const referencedIndices = getReferencedSourceIndices(msg.content);
+          const citedSources = allSources.filter((s) =>
+            referencedIndices.has(s.index)
+          );
+          const showCitationFooter = citedSources.length > 0;
 
           return (
             <div
@@ -302,55 +305,14 @@ export default function ChatBot() {
                     </ReactMarkdown>
                     {showCitationFooter && (
                       <div className="citations-footer" aria-label="Sources">
-<<<<<<< HEAD
-                        <ul className="citations-footer-list">
-                          {citedSources.map((s) => (
-                            <li
-                              key={s.index}
-                              id={`cite-${i}-${s.index}`}
-                              className="citation-line"
-                            >
-                              {s.url ? (
-                                <a
-                                  href={s.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="citation-line-link"
-                                >
-                                  <span className="citation-line-index">
-                                    [{s.index}]
-                                  </span>{" "}
-                                  <span className="citation-line-body">
-                                    {s.reviewer}
-                                    {s.date != null ? ` — ${s.date}` : ""} (via{" "}
-                                    {s.source})
-                                  </span>
-                                </a>
-                              ) : (
-                                <>
-                                  <span className="citation-line-index">
-                                    [{s.index}]
-                                  </span>{" "}
-                                  <span className="citation-line-body">
-                                    {s.reviewer}
-                                    {s.date != null ? ` — ${s.date}` : ""} (via{" "}
-                                    {s.source})
-                                  </span>
-                                </>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-=======
                         <span className="citation-sources-label">Sources:</span>{" "}
-                        {allSources.map((s, idx) => (
+                        {citedSources.map((s, idx) => (
                           <span key={`${s.index}-${idx}`}>
                             {idx > 0 ? ", " : null}
                             <span className="citation-name">{s.reviewer}</span>
                           </span>
                         ))}
                         <span className="citations-footer-end">.</span>
->>>>>>> 2450031694f4783d4f071a526c47649fb4cdfff6
                       </div>
                     )}
                   </>

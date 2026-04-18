@@ -440,7 +440,6 @@ body {
   color: #6b7280;
 }
 
-<<<<<<< HEAD
 .citations-footer-list {
   list-style: none;
   margin: 0;
@@ -472,9 +471,9 @@ body {
 
 .citation-line-index {
   color: var(--accent);
-=======
+}
+
 .citation-sources-label {
->>>>>>> 2450031694f4783d4f071a526c47649fb4cdfff6
   font-weight: 600;
   color: var(--tt-muted);
 }
@@ -484,7 +483,6 @@ body {
   color: var(--tt-text);
 }
 
-<<<<<<< HEAD
 .citation-line {
   scroll-margin-top: 8px;
 }
@@ -504,16 +502,12 @@ body {
   text-decoration: underline;
 }
 
-/* ── Loading Dots ── */
-.loading-bubble {
-=======
 .citations-footer-end {
   color: var(--tt-text);
 }
 
 /* ── Typing indicator ── */
 .typing-indicator {
->>>>>>> 2450031694f4783d4f071a526c47649fb4cdfff6
   display: flex;
   align-items: center;
   gap: 6px;
